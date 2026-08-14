@@ -1,0 +1,103 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: SteamRecordingExporter-linux
+            ffmpeg_url: https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-linux64-gpl.tar.xz
+            ffmpeg_archive: ffmpeg.tar.xz
+          - os: windows-latest
+            artifact: SteamRecordingExporter-windows
+            ffmpeg_url: https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-gpl.zip
+            ffmpeg_archive: ffmpeg.zip
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install PyInstaller
+        run: pip install pyinstaller
+
+      - name: Download ffmpeg (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p vendor/ffmpeg
+          curl -L -o "${{ matrix.ffmpeg_archive }}" "${{ matrix.ffmpeg_url }}"
+          tar -xf "${{ matrix.ffmpeg_archive }}"
+          cp ./ffmpeg-*/bin/ffmpeg  vendor/ffmpeg/ffmpeg
+          cp ./ffmpeg-*/bin/ffprobe vendor/ffmpeg/ffprobe
+          chmod +x vendor/ffmpeg/*
+          rm -rf ffmpeg-*
+
+      - name: Download ffmpeg (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force vendor/ffmpeg | Out-Null
+          Invoke-WebRequest -Uri "${{ matrix.ffmpeg_url }}" -OutFile "${{ matrix.ffmpeg_archive }}"
+          Expand-Archive -Path "${{ matrix.ffmpeg_archive }}" -DestinationPath ffmpeg-extract
+          Copy-Item ./ffmpeg-extract/ffmpeg-*/bin/ffmpeg.exe  vendor/ffmpeg/ffmpeg.exe
+          Copy-Item ./ffmpeg-extract/ffmpeg-*/bin/ffprobe.exe vendor/ffmpeg/ffprobe.exe
+
+      - name: Build with PyInstaller
+        run: pyinstaller packaging/steam-recording-exporter.spec --noconfirm
+
+      - name: Smoke test (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          ls -lh dist/
+          test -x dist/SteamRecordingExporter
+          ./dist/SteamRecordingExporter --version >/dev/null 2>&1; test $? -ne 0 || true
+
+      - name: Smoke test (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Get-ChildItem dist | Select-Object Name, Length
+          if (-not (Test-Path dist/SteamRecordingExporter.exe)) { exit 1 }
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/
+          if-no-files-found: error
+
+  release:
+    name: Publish Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: false
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/SteamRecordingExporter-linux/**/*
+            artifacts/SteamRecordingExporter-windows/**/*
+          generate_release_notes: true
