@@ -1,6 +1,6 @@
 # Steam 录制导出器
 
-用于将 Steam（Steam 游戏录制 / Game Recording）
+用于将 Steam
 录制的视频导出为 MP4 文件。在Linux和Windows上可用。
 
 
