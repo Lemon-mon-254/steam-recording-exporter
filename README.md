@@ -33,30 +33,6 @@ python3 main.py
 5. 点击 *导出选中项*。
 
 
-## 构建发布版
-
-使用 PyInstaller 构建单个自包含可执行文件。当存在 `vendor/ffmpeg/` 目录时会自动捆绑 ffmpeg：
-
-```bash
-python3 -m venv .venv
-.venv/bin/pip install pyinstaller
-mkdir -p vendor/ffmpeg && cp /usr/bin/ffmpeg /usr/bin/ffprobe vendor/ffmpeg/   # Linux
-.venv/bin/pyinstaller packaging/steam-recording-exporter.spec --noconfirm
-# 结果：dist/SteamRecordingExporter
-```
-
-GitHub Actions 会自动下载静态版 ffmpeg、捆绑打包，并在推送 `v*` 标签时自动构建
-Linux 和 Windows 二进制并挂到 Releases 页面。详见 `.github/workflows/release.yml`。
-
-## 开发
-
-```bash
-git clone https://github.com/yourname/steam-recording-exporter.git
-cd steam-recording-exporter
-python3 main.py            # 源码运行 GUI
-python3 -m pytest          # 单元测试（tests/）
-```
-
 ## 许可证
 
 MIT
