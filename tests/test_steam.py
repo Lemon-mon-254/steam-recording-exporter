@@ -175,3 +175,17 @@ def test_find_clips_merges_clips_and_background_recordings(tmp_path):
     assert "clip_250900_20251129_034618" in names
     assert "bg_250900_20250701_120000" in names
     assert names == sorted(names, reverse=True)
+
+
+def test_find_clips_skips_duplicate_background_recordings(tmp_path):
+    custom = str(tmp_path / "custom-clips")
+    steam_root, _ = _make_steam_tree(tmp_path, custom_recordings=custom)
+    _make_clip(os.path.join(custom, "clips"), CLIP_DIR_NAMES[0])
+    duplicate_bg_dir = os.path.join(custom, "video", "bg_250900_20251129_034618")
+    os.makedirs(duplicate_bg_dir)
+    with open(os.path.join(duplicate_bg_dir, "session.mpd"), "w", encoding="utf-8") as handle:
+        handle.write("<MPD/>")
+    clips = steam.find_clips(custom)
+    names = [c.name for c in clips]
+    assert names.count("clip_250900_20251129_034618") == 1
+    assert names.count("bg_250900_20251129_034618") == 0

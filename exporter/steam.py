@@ -367,7 +367,15 @@ def find_clips(recordings_path: str):
         if clip:
             clips.append(clip)
 
-    clips.extend(_scan_background_recordings(recordings_path))
+    existing_segment_labels = {
+        segment.label
+        for clip in clips
+        for segment in clip.segments
+    }
+    for recording in _scan_background_recordings(recordings_path):
+        if recording.name in existing_segment_labels:
+            continue
+        clips.append(recording)
     clips.sort(key=lambda c: (c.date, c.time), reverse=True)
     return clips
 
